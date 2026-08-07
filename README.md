@@ -23,7 +23,7 @@ Using the [`compose.yaml`](compose.yaml) in this repo as a starting point:
 ```yaml
 services:
   keeper:
-    image: arlab1/plexamp-aurral-keeper:latest
+    image: ghcr.io/arlab1/plexamp-aurral-keeper:latest
     restart: unless-stopped
     ports:
       - "30074:3010"
@@ -60,6 +60,10 @@ it came up with `curl http://<host>:30074/health`:
 ```json
 {"ok":true,"sourceLibrary":"Aurral","minRating":10,"flowTracksIndexed":168}
 ```
+
+Images are published to the GitHub Container Registry for `linux/amd64` and
+`linux/arm64`: `:latest` tracks `main`, and version tags like `:1.0.0` come from
+a `v1.0.0` git tag. Pin a version if you'd rather not follow `main`.
 
 ### Building the image yourself
 
