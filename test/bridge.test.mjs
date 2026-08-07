@@ -67,6 +67,11 @@ function makeFetch(overrides = {}, calls = []) {
     if (url.endsWith("/api/library/albums/request")) {
       return jsonResponse(overrides.requestResult ?? { album: { id: 77 }, artist: { id: 9 } });
     }
+    if (url.endsWith("/api/library/downloads/album/search")) {
+      return overrides.searchFails
+        ? new Response("lidarr refused", { status: 500 })
+        : jsonResponse({ ok: true });
+    }
     return new Response("not found", { status: 404 });
   };
 }
@@ -556,4 +561,117 @@ test("reuses the flow job index until its TTL expires", async () => {
   clock += 600;
   await index.find({ artistName: "A", trackName: "B" }, AURRAL_FILE);
   assert.equal(calls.filter((call) => call.url.endsWith("/api/playlists/status")).length, 2);
+});
+
+test("triggers the search after requesting, since Aurral needs both steps", async () => {
+  const calls = [];
+  const bridge = makeBridge({
+    jobs: [{
+      artistName: "Massive Attack",
+      trackName: "Teardrop",
+      albumName: "Mezzanine",
+      artistMbid: "artist-mbid",
+      albumMbid: "album-mbid",
+      finalPath: AURRAL_FILE,
+    }],
+    artist: {
+      "release-groups": [
+        { id: "album-mbid", title: "Mezzanine", "primary-type": "Album", "secondary-types": [] },
+      ],
+    },
+  }, calls);
+
+  const result = await bridge.process(RATE_PAYLOAD);
+  assert.equal(result.action, "requested");
+  assert.equal(result.searched, true);
+
+  const search = calls.find((call) => call.url.endsWith("/api/library/downloads/album/search"));
+  assert.ok(search, "expected an explicit search call");
+  assert.deepEqual(JSON.parse(search.options.body), { albumId: 77 });
+  // The request must come first: searching an album Lidarr does not have is a no-op.
+  assert.ok(
+    calls.findIndex((c) => c.url.endsWith("/api/library/albums/request")) <
+      calls.findIndex((c) => c.url.endsWith("/api/library/downloads/album/search")),
+  );
+});
+
+test("does not search again when Aurral already triggered one", async () => {
+  const calls = [];
+  const bridge = makeBridge({
+    jobs: [{
+      artistName: "Massive Attack",
+      trackName: "Teardrop",
+      albumMbid: "album-mbid",
+      artistMbid: "artist-mbid",
+      albumName: "Mezzanine",
+      finalPath: AURRAL_FILE,
+    }],
+    requestResult: { album: { id: 77 }, triggeredSearch: true },
+  }, calls);
+
+  const result = await bridge.process(RATE_PAYLOAD);
+  assert.equal(result.searched, true);
+  assert.equal(calls.filter((c) => c.url.endsWith("/album/search")).length, 0);
+});
+
+test("reports a deferred search when the add is queued without an album id", async () => {
+  const bridge = makeBridge({
+    jobs: [{
+      artistName: "Massive Attack",
+      trackName: "Teardrop",
+      albumMbid: "album-mbid",
+      artistMbid: "artist-mbid",
+      albumName: "Mezzanine",
+      finalPath: AURRAL_FILE,
+    }],
+    requestResult: { queued: true },
+  });
+  const result = await bridge.process(RATE_PAYLOAD);
+  assert.equal(result.action, "requested");
+  assert.equal(result.searched, false);
+  assert.equal(result.searchSkipped, "queued");
+});
+
+test("a failed search still reports the album as requested", async () => {
+  const bridge = makeBridge({
+    jobs: [{
+      artistName: "Massive Attack",
+      trackName: "Teardrop",
+      albumMbid: "album-mbid",
+      artistMbid: "artist-mbid",
+      albumName: "Mezzanine",
+      finalPath: AURRAL_FILE,
+    }],
+    searchFails: true,
+  });
+  const result = await bridge.process(RATE_PAYLOAD);
+  assert.equal(result.action, "requested");
+  assert.equal(result.searched, false);
+  assert.match(result.searchError, /500/);
+});
+
+test("TRIGGER_SEARCH=false skips the search entirely", async () => {
+  const calls = [];
+  const bridge = new KeeperBridge({
+    fetch: makeFetch({
+      jobs: [{
+        artistName: "Massive Attack",
+        trackName: "Teardrop",
+        albumMbid: "album-mbid",
+        artistMbid: "artist-mbid",
+        albumName: "Mezzanine",
+        finalPath: AURRAL_FILE,
+      }],
+    }, calls),
+    plexUrl: "http://plex",
+    plexToken: "plex-token",
+    aurralUrl: "http://aurral",
+    aurralApiKey: "aurral-key",
+    triggerSearch: false,
+  });
+
+  const result = await bridge.process(RATE_PAYLOAD);
+  assert.equal(result.searched, false);
+  assert.equal(result.searchSkipped, "disabled");
+  assert.equal(calls.filter((c) => c.url.endsWith("/album/search")).length, 0);
 });

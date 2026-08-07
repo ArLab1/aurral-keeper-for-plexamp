@@ -247,6 +247,13 @@ export class AurralClient {
       body: JSON.stringify(album),
     });
   }
+
+  async searchAlbum(libraryAlbumId) {
+    return this.request("/library/downloads/album/search", {
+      method: "POST",
+      body: JSON.stringify({ albumId: libraryAlbumId }),
+    });
+  }
 }
 
 /**
@@ -586,6 +593,9 @@ export class KeeperBridge {
       throw error;
     }
 
+    const libraryAlbumId = response?.album?.id ?? null;
+    const search = await this.ensureSearched(response, libraryAlbumId);
+
     return {
       action: "requested",
       rating: decision.rating,
@@ -594,8 +604,32 @@ export class KeeperBridge {
       artistName: album.artistName,
       resolvedBy: album.source,
       queued: Boolean(response?.queued),
-      libraryAlbumId: response?.album?.id ?? null,
+      libraryAlbumId,
+      ...search,
     };
+  }
+
+  /**
+   * Aurral only honours `triggerSearch` for an album already in the library;
+   * adding one and searching for it are two steps, which is why the UI's button
+   * reads "Add to Lidarr" and only then "Search Album". Requesting alone leaves
+   * the album monitored with nothing downloaded, so the search is kicked off
+   * explicitly. A failure here is logged, not thrown: the album is already
+   * monitored, and re-rating retries.
+   */
+  async ensureSearched(response, libraryAlbumId) {
+    if (!this.triggerSearch) return { searched: false, searchSkipped: "disabled" };
+    if (response?.triggeredSearch) return { searched: true };
+    if (!libraryAlbumId) {
+      return { searched: false, searchSkipped: response?.queued ? "queued" : "no-album-id" };
+    }
+    try {
+      await this.aurral.searchAlbum(libraryAlbumId);
+      return { searched: true };
+    } catch (error) {
+      console.warn(`Search trigger failed for album ${libraryAlbumId}: ${error.message}`);
+      return { searched: false, searchError: error.message };
+    }
   }
 }
 
