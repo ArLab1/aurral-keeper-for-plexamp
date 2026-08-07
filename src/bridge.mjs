@@ -607,7 +607,7 @@ export async function loadConfig() {
     bridge: {
       plexUrl: process.env.PLEX_URL || "http://localhost:32400",
       plexToken: await secretFromEnv("PLEX_TOKEN"),
-      aurralUrl: process.env.AURRAL_URL || "http://localhost:30073",
+      aurralUrl: process.env.AURRAL_URL || "http://localhost:3000",
       aurralApiKey: await secretFromEnv("AURRAL_API_KEY"),
       sourceLibrary: process.env.SOURCE_LIBRARY || "Aurral",
       sourcePathFragment: process.env.SOURCE_PATH_FRAGMENT || "/aurral-weekly-flow/",

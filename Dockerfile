@@ -10,7 +10,7 @@ ENV NODE_ENV=production \
 EXPOSE 3010
 
 # Run unprivileged. Override with `user:` in compose when the secret files are
-# owned by another uid (TrueNAS apps run as 568:568).
+# owned by another uid.
 USER node
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \

@@ -82,7 +82,7 @@ Requires Node 22+. Every secret also accepts a direct value instead of a file
 | --- | --- | --- |
 | `PLEX_URL` | `http://localhost:32400` | Plex server, used to re-read the rated track's metadata |
 | `PLEX_TOKEN` / `PLEX_TOKEN_FILE` | — | Plex API token (required) |
-| `AURRAL_URL` | `http://localhost:30073` | Aurral server |
+| `AURRAL_URL` | `http://localhost:3000` | Aurral server |
 | `AURRAL_API_KEY` / `AURRAL_API_KEY_FILE` | — | Aurral API key (required) |
 | `WEBHOOK_SECRET` / `WEBHOOK_SECRET_FILE` | — | Shared secret in the webhook path (required) |
 | `SOURCE_LIBRARY` | `Aurral` | Plex library whose ratings count |
