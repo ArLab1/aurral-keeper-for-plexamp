@@ -2,7 +2,7 @@
 
 Star a track 5 stars in Plexamp; get the whole album, properly, through Lidarr.
 
-[Aurral](https://github.com/aurral) flows download throwaway copies of tracks it
+[Aurral](https://github.com/lklynet/aurral) flows download throwaway copies of tracks it
 thinks you might like. When one turns out to be a keeper, you want the real
 release in your library — not the flow's temporary file. This bridge listens for
 Plex `media.rate` webhooks and asks Aurral to request that track's **album**, so
