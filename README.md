@@ -135,10 +135,17 @@ Steps 1–3 exist because Aurral's flow metadata often points at a compilation t
 song was licensed to ("Xmas Pop") rather than the album it belongs to. The
 `resolvedBy` field in the log line says which rung answered.
 
-The album then goes to `POST /api/library/albums/request` with
-`triggerSearch: true`. Requests are deduplicated by album mbid for 10 minutes,
-so starring three tracks off one album asks for it once. Failures are logged and
-dropped — re-rate the track to try again.
+The album then goes to `POST /api/library/albums/request`, followed by
+`POST /api/library/downloads/album/search` for the returned Lidarr album id.
+Both calls are needed: Aurral only honours `triggerSearch` for an album already
+in the library, so a request on its own leaves the album monitored with nothing
+downloaded — which is why its own UI reads "Add to Lidarr" first and "Search
+Album" only afterwards. Set `TRIGGER_SEARCH=false` to add without searching.
+
+Requests are deduplicated by album mbid for 10 minutes, so starring three tracks
+off one album asks for it once. Failures are logged and dropped — re-rate the
+track to try again. The log line reports `searched`, and `searchSkipped` or
+`searchError` when the search didn't happen.
 
 Ratings below the threshold, ratings outside the Aurral library, and lowering a
 rating are all ignored.
