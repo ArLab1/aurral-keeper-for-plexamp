@@ -1,0 +1,30 @@
+{
+  "name": "plexamp-aurral-keeper",
+  "version": "1.0.0",
+  "description": "Turns a 5-star rating in Plexamp into a proper album request through Aurral and Lidarr",
+  "type": "module",
+  "main": "src/bridge.mjs",
+  "bin": {
+    "plexamp-aurral-keeper": "src/bridge.mjs"
+  },
+  "files": [
+    "src"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/bridge.mjs",
+    "test": "node --test \"test/**/*.test.mjs\""
+  },
+  "keywords": [
+    "plex",
+    "plexamp",
+    "aurral",
+    "lidarr",
+    "webhook",
+    "self-hosted"
+  ],
+  "license": "MIT",
+  "private": false
+}

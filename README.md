@@ -1,12 +1,99 @@
-# Plexamp → Aurral album requests
+# Plexamp → Aurral keeper
 
-Receives Plex `media.rate` webhooks. A 5-star rating on a track in the Plex
-`Aurral` library asks Aurral to request that track's **album** through Lidarr,
-so the album is fetched properly instead of the flow's throwaway download being
-pinned in a playlist.
+Star a track 5 stars in Plexamp; get the whole album, properly, through Lidarr.
 
-The service deliberately ignores ratings from other Plex libraries and ratings
-below 5 stars. Lowering a rating does not undo a request.
+[Aurral](https://github.com/aurral) flows download throwaway copies of tracks it
+thinks you might like. When one turns out to be a keeper, you want the real
+release in your library — not the flow's temporary file. This bridge listens for
+Plex `media.rate` webhooks and asks Aurral to request that track's **album**, so
+Lidarr fetches it at your usual quality and it lands in your main music library.
+
+- No dependencies — plain ESM on the Node standard library
+- No state, no database, no writable volume
+- Ignores everything except 5-star ratings inside your Aurral library
+
+## Quick start
+
+```bash
+docker compose up -d
+```
+
+Using the [`compose.yaml`](compose.yaml) in this repo as a starting point:
+
+```yaml
+services:
+  keeper:
+    image: arlab1/plexamp-aurral-keeper:latest
+    restart: unless-stopped
+    ports:
+      - "30074:3010"
+    environment:
+      PLEX_URL: "http://plex:32400"
+      AURRAL_URL: "http://aurral:3000"
+      PLEX_TOKEN_FILE: "/run/keeper-secrets/plex_token"
+      AURRAL_API_KEY_FILE: "/run/keeper-secrets/aurral_api_key"
+      WEBHOOK_SECRET_FILE: "/run/keeper-secrets/webhook_secret"
+    volumes:
+      - ./secrets:/run/keeper-secrets:ro
+    read_only: true
+```
+
+Create the three secret files first:
+
+```bash
+mkdir -p secrets
+printf '%s' 'your-plex-token'    > secrets/plex_token
+printf '%s' 'your-aurral-key'    > secrets/aurral_api_key
+openssl rand -hex 24             > secrets/webhook_secret
+chmod 600 secrets/*
+```
+
+Then point Plex at it. In **Settings → Webhooks** (Plex Pass required), add:
+
+```
+http://<host>:30074/plex/<contents-of-webhook_secret>
+```
+
+The secret is part of the URL, which is how the endpoint authenticates. Check
+it came up with `curl http://<host>:30074/health`:
+
+```json
+{"ok":true,"sourceLibrary":"Aurral","minRating":10,"flowTracksIndexed":168}
+```
+
+### Building the image yourself
+
+```bash
+docker build -t plexamp-aurral-keeper .
+```
+
+### Running without Docker
+
+```bash
+npm start
+```
+
+Requires Node 22+. Every secret also accepts a direct value instead of a file
+(`PLEX_TOKEN` rather than `PLEX_TOKEN_FILE`), which is handy for local runs.
+
+## Configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PLEX_URL` | `http://localhost:32400` | Plex server, used to re-read the rated track's metadata |
+| `PLEX_TOKEN` / `PLEX_TOKEN_FILE` | — | Plex API token (required) |
+| `AURRAL_URL` | `http://localhost:30073` | Aurral server |
+| `AURRAL_API_KEY` / `AURRAL_API_KEY_FILE` | — | Aurral API key (required) |
+| `WEBHOOK_SECRET` / `WEBHOOK_SECRET_FILE` | — | Shared secret in the webhook path (required) |
+| `SOURCE_LIBRARY` | `Aurral` | Plex library whose ratings count |
+| `SOURCE_PATH_FRAGMENT` | `/aurral-weekly-flow/` | Path marker shared by Plex and Aurral |
+| `MIN_RATING` | `10` | Plex rating threshold; 10 is 5 stars |
+| `FLOW_JOB_CACHE_MS` | `300000` | How long the flow track index is reused |
+| `MAX_TRACKLIST_LOOKUPS` | `12` | Cap on tracklist reads per resolution |
+| `TRIGGER_SEARCH` | `true` | Ask Lidarr to search immediately |
+| `PORT` | `3010` | Listen port |
+
+Endpoints: `POST /plex/<secret>` for the webhook, `GET /health` for liveness.
 
 ## How a rated track becomes an album request
 
@@ -49,29 +136,26 @@ The album then goes to `POST /api/library/albums/request` with
 so starring three tracks off one album asks for it once. Failures are logged and
 dropped — re-rate the track to try again.
 
-## Configuration
+Ratings below the threshold, ratings outside the Aurral library, and lowering a
+rating are all ignored.
 
-- `PLEX_URL` and `PLEX_TOKEN_FILE`
-- `AURRAL_URL` and `AURRAL_API_KEY_FILE`
-- `WEBHOOK_SECRET_FILE`
-- Optional: `SOURCE_LIBRARY` (`Aurral`), `SOURCE_PATH_FRAGMENT`
-  (`/aurral-weekly-flow/`), `MIN_RATING` (`10`), `FLOW_JOB_CACHE_MS`
-  (`300000`), `MAX_TRACKLIST_LOOKUPS` (`12`), `TRIGGER_SEARCH` (`true`),
-  `PORT` (`3010`)
+## Layout
 
-The Plex webhook URL is `http://<host>:<port>/plex/<webhook-secret>`. The health
-endpoint is `/health`. Plex webhooks require Plex Pass.
-
-## Deployment
-
-Runs as a custom compose app on a NAS: stock `node:22-alpine` with
-`/srv/apps/plexamp-aurral-keeper/app` bind-mounted read-only and
-`node /app/bridge.mjs` as the command. There are no dependencies and no build
-step — deploying is copying `bridge.mjs` into that directory and restarting the
-app.
-
-Run tests with:
-
-```sh
-node --test bridge.test.mjs
 ```
+src/bridge.mjs        the whole service
+test/bridge.test.mjs  node --test suite, no network
+Dockerfile            stock node:22-alpine, no build step
+compose.yaml          example deployment
+```
+
+## Development
+
+```bash
+npm test
+```
+
+The tests inject a fake `fetch`, so nothing touches a real Plex or Aurral.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

@@ -14,7 +14,7 @@ import {
   parsePlexMetadata,
   parsePlexWebhook,
   resolveAlbum,
-} from "./bridge.mjs";
+} from "../src/bridge.mjs";
 
 const PLEX_FILE = "/Media/downloads/aurral/aurral-weekly-flow/flow-1/Massive Attack/Mezzanine/Teardrop.m4a";
 const AURRAL_FILE = "/app/downloads/aurral-weekly-flow/flow-1/Massive Attack/Mezzanine/Teardrop.m4a";
