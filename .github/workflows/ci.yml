@@ -21,4 +21,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t plexamp-aurral-keeper:ci .
+      - run: docker build -t aurral-keeper-for-plexamp:ci .

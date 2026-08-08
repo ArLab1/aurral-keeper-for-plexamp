@@ -1,8 +1,8 @@
 # Example deployment. Copy, adjust the paths and URLs, then `docker compose up -d`.
 services:
   keeper:
-    image: ghcr.io/arlab1/plexamp-aurral-keeper:latest
-    container_name: plexamp-aurral-keeper
+    image: ghcr.io/arlab1/aurral-keeper-for-plexamp:latest
+    container_name: aurral-keeper-for-plexamp
     restart: unless-stopped
     ports:
       - "30074:3010"

@@ -1,11 +1,11 @@
 {
-  "name": "plexamp-aurral-keeper",
+  "name": "aurral-keeper-for-plexamp",
   "version": "1.0.0",
   "description": "Turns a 5-star rating in Plexamp into a proper album request through Aurral and Lidarr",
   "type": "module",
   "main": "src/bridge.mjs",
   "bin": {
-    "plexamp-aurral-keeper": "src/bridge.mjs"
+    "aurral-keeper-for-plexamp": "src/bridge.mjs"
   },
   "files": [
     "src"
