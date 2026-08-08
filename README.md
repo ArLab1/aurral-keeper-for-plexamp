@@ -1,4 +1,4 @@
-# Plexamp → Aurral keeper
+# Aurral Keeper for Plexamp
 
 Star a track 5 stars in Plexamp; get the whole album, properly, through Lidarr.
 
@@ -23,7 +23,7 @@ Using the [`compose.yaml`](compose.yaml) in this repo as a starting point:
 ```yaml
 services:
   keeper:
-    image: ghcr.io/arlab1/plexamp-aurral-keeper:latest
+    image: ghcr.io/arlab1/aurral-keeper-for-plexamp:latest
     restart: unless-stopped
     ports:
       - "30074:3010"
@@ -68,7 +68,7 @@ a `v1.0.0` git tag. Pin a version if you'd rather not follow `main`.
 ### Building the image yourself
 
 ```bash
-docker build -t plexamp-aurral-keeper .
+docker build -t aurral-keeper-for-plexamp .
 ```
 
 ### Running without Docker

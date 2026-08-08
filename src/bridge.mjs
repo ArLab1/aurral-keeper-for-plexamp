@@ -687,7 +687,7 @@ export async function start(config = null) {
     }
   });
   server.listen(config.port, "0.0.0.0", () => {
-    console.log(`Plexamp Aurral keeper listening on port ${config.port}`);
+    console.log(`Aurral Keeper for Plexamp listening on port ${config.port}`);
   });
   return { server, bridge };
 }
