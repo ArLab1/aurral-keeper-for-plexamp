@@ -107,3 +107,68 @@ export function formatDiscord(notification, { username = "Aurral Keeper" } = {})
 export function formatGeneric(notification) {
   return notification;
 }
+
+const FORMATTERS = { discord: formatDiscord, generic: formatGeneric };
+const DISCORD_HOSTS = /(^|\.)(discord\.com|discordapp\.com)$/;
+const DEFAULT_TIMEOUT_MS = 5000;
+
+/** Picks a wire format from the URL, so a Discord webhook needs no extra config. */
+export function detectFormat(url) {
+  try {
+    return DISCORD_HOSTS.test(new URL(url).hostname.toLowerCase()) ? "discord" : "generic";
+  } catch {
+    return "generic";
+  }
+}
+
+/**
+ * Fire-and-forget delivery. Every failure is logged and swallowed: a deleted
+ * Discord webhook or a network blip must not turn into a 500 for Plex.
+ */
+export class Notifier {
+  constructor({
+    fetch: fetchImpl,
+    url = null,
+    level = "warn",
+    format = null,
+    username = "Aurral Keeper",
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+  } = {}) {
+    if (!LEVELS.includes(level)) {
+      throw new Error(`NOTIFY_LEVEL must be one of: ${LEVELS.join(", ")}`);
+    }
+    const resolved = format || (url ? detectFormat(url) : "generic");
+    if (!FORMATTERS[resolved]) {
+      throw new Error(`NOTIFY_FORMAT must be one of: ${Object.keys(FORMATTERS).join(", ")}`);
+    }
+    this.fetch = fetchImpl || globalThis.fetch;
+    this.url = url || null;
+    this.level = level;
+    this.format = resolved;
+    this.username = username;
+    this.timeoutMs = timeoutMs;
+  }
+
+  enabled() {
+    return Boolean(this.url);
+  }
+
+  async notify(result, error = null) {
+    if (!this.enabled()) return;
+    const notification = buildNotification(result, error);
+    if (LEVELS.indexOf(notification.level) < LEVELS.indexOf(this.level)) return;
+    try {
+      const response = await this.fetch(this.url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(FORMATTERS[this.format](notification, { username: this.username })),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+      if (!response.ok) {
+        console.warn(`Notification returned ${response.status}`);
+      }
+    } catch (sendError) {
+      console.warn(`Notification failed: ${sendError.message}`);
+    }
+  }
+}

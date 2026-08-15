@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { LEVELS, buildNotification, formatDiscord, formatGeneric } from "../src/notify.mjs";
+import { LEVELS, buildNotification, formatDiscord, formatGeneric, Notifier, detectFormat } from "../src/notify.mjs";
 
 const REQUESTED = {
   action: "requested",
@@ -133,4 +133,105 @@ test("the generic body is the canonical notification", () => {
     description: "**Mezzanine** — Massive Attack",
     fields: { rating: 10, resolvedBy: "track-on-album", searched: true },
   });
+});
+
+function recordingFetch(calls, response = new Response(null, { status: 204 })) {
+  return async (url, options) => {
+    calls.push({ url, options });
+    if (response instanceof Error) throw response;
+    return response;
+  };
+}
+
+test("a discord.com URL formats as Discord, anything else as generic", () => {
+  assert.equal(detectFormat("https://discord.com/api/webhooks/1/abc"), "discord");
+  assert.equal(detectFormat("https://discordapp.com/api/webhooks/1/abc"), "discord");
+  assert.equal(detectFormat("https://ptb.discord.com/api/webhooks/1/abc"), "discord");
+  assert.equal(detectFormat("https://home.lan/api/webhook/xyz"), "generic");
+  assert.equal(detectFormat("not a url"), "generic");
+  assert.equal(detectFormat("https://notdiscord.com/hook"), "generic");
+});
+
+test("an explicit format overrides the URL host", () => {
+  const notifier = new Notifier({ url: "https://discord.com/api/webhooks/1/a", format: "generic" });
+  assert.equal(notifier.format, "generic");
+});
+
+test("a notifier without a URL is disabled and never fetches", async () => {
+  const calls = [];
+  const notifier = new Notifier({ fetch: recordingFetch(calls) });
+  assert.equal(notifier.enabled(), false);
+  await notifier.notify(REQUESTED);
+  assert.equal(calls.length, 0);
+});
+
+test("the default threshold suppresses debug and passes warn", async () => {
+  const calls = [];
+  const notifier = new Notifier({
+    fetch: recordingFetch(calls),
+    url: "https://discord.com/api/webhooks/1/a",
+  });
+  assert.equal(notifier.level, "warn");
+  await notifier.notify({ action: "ignore", reason: "recent-duplicate" });
+  assert.equal(calls.length, 0);
+  await notifier.notify({ action: "ignore", reason: "unresolved-album", track: {} });
+  assert.equal(calls.length, 1);
+});
+
+test("a POST carries the URL, JSON content type, and a Discord body", async () => {
+  const calls = [];
+  const notifier = new Notifier({
+    fetch: recordingFetch(calls),
+    url: "https://discord.com/api/webhooks/1/a",
+    level: "info",
+    username: "Keeper",
+  });
+  await notifier.notify(REQUESTED);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "https://discord.com/api/webhooks/1/a");
+  assert.equal(calls[0].options.method, "POST");
+  assert.equal(calls[0].options.headers["content-type"], "application/json");
+  const body = JSON.parse(calls[0].options.body);
+  assert.equal(body.username, "Keeper");
+  assert.equal(body.embeds[0].title, "Album requested");
+});
+
+test("NOTIFY_LEVEL=debug lets ignores through, as the canonical object", async () => {
+  const calls = [];
+  const notifier = new Notifier({
+    fetch: recordingFetch(calls),
+    url: "https://home.lan/hook",
+    level: "debug",
+  });
+  await notifier.notify({ action: "ignore", reason: "recent-duplicate", albumMbid: "abc-123" });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    level: "debug",
+    title: "Ignored: recent-duplicate",
+    description: "",
+    fields: { albumMbid: "abc-123" },
+  });
+});
+
+test("a rejected fetch does not throw", async () => {
+  const notifier = new Notifier({
+    fetch: recordingFetch([], new Error("connect ECONNREFUSED")),
+    url: "https://home.lan/hook",
+    level: "info",
+  });
+  await notifier.notify(REQUESTED);
+});
+
+test("a 404 from a deleted webhook does not throw", async () => {
+  const notifier = new Notifier({
+    fetch: recordingFetch([], new Response("gone", { status: 404 })),
+    url: "https://discord.com/api/webhooks/1/a",
+    level: "info",
+  });
+  await notifier.notify(REQUESTED);
+});
+
+test("an unusable level or format is rejected at construction", () => {
+  assert.throws(() => new Notifier({ url: "https://home.lan/hook", level: "verbose" }), /NOTIFY_LEVEL/);
+  assert.throws(() => new Notifier({ url: "https://home.lan/hook", format: "slack" }), /NOTIFY_FORMAT/);
 });
