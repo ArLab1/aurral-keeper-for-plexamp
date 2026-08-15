@@ -202,6 +202,7 @@ src/bridge.mjs        the whole service
 src/notify.mjs        outbound webhook notifications
 test/bridge.test.mjs  node --test suite, no network
 test/notify.test.mjs  notification unit tests
+test/start.test.mjs   server wiring tests
 Dockerfile            stock node:22-alpine, no build step
 compose.yaml          example deployment
 ```
