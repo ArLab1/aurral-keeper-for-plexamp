@@ -64,3 +64,46 @@ export function buildNotification(result, error = null) {
     }),
   };
 }
+
+const LEVEL_COLORS = {
+  debug: 0x99aab5,
+  info: 0x57f287,
+  warn: 0xfee75c,
+  error: 0xed4245,
+};
+
+/** Display names for the field keys `buildNotification` emits. */
+const FIELD_LABELS = {
+  rating: "Rating",
+  resolvedBy: "Resolved by",
+  searched: "Searched",
+  searchError: "Search error",
+  library: "Library",
+  albumMbid: "Album MBID",
+};
+
+export function formatDiscord(notification, { username = "Aurral Keeper" } = {}) {
+  const embed = {
+    title: notification.title,
+    color: LEVEL_COLORS[notification.level] ?? LEVEL_COLORS.debug,
+  };
+  if (notification.description) embed.description = notification.description;
+  const entries = Object.entries(notification.fields || {});
+  if (entries.length) {
+    embed.fields = entries.map(([key, value]) => ({
+      name: FIELD_LABELS[key] || key,
+      value: String(value),
+      inline: true,
+    }));
+  }
+  return { username, embeds: [embed] };
+}
+
+/**
+ * The canonical notification, posted as-is. Stable and self-describing, which
+ * is what a Home Assistant webhook or a hand-written receiver needs. `username`
+ * is a Discord concept and has no home here.
+ */
+export function formatGeneric(notification) {
+  return notification;
+}

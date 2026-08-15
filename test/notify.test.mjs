@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { LEVELS, buildNotification } from "../src/notify.mjs";
+import { LEVELS, buildNotification, formatDiscord, formatGeneric } from "../src/notify.mjs";
 
 const REQUESTED = {
   action: "requested",
@@ -82,4 +82,55 @@ test("a thrown error is an error, truncated to 500 characters", () => {
   assert.equal(notification.level, "error");
   assert.equal(notification.title, "Webhook failed");
   assert.equal(notification.description.length, 500);
+});
+
+test("a Discord embed carries the level's color and inline fields", () => {
+  const body = formatDiscord(buildNotification(REQUESTED), { username: "Keeper" });
+  assert.equal(body.username, "Keeper");
+  assert.equal(body.embeds.length, 1);
+  const [embed] = body.embeds;
+  assert.equal(embed.title, "Album requested");
+  assert.equal(embed.description, "**Mezzanine** — Massive Attack");
+  assert.equal(embed.color, 0x57f287);
+  assert.deepEqual(embed.fields, [
+    { name: "Rating", value: "10", inline: true },
+    { name: "Resolved by", value: "track-on-album", inline: true },
+    { name: "Searched", value: "true", inline: true },
+  ]);
+});
+
+test("each level gets its own Discord color", () => {
+  const colorOf = (notification) => formatDiscord(notification).embeds[0].color;
+  assert.equal(colorOf({ level: "debug", title: "t", description: "", fields: {} }), 0x99aab5);
+  assert.equal(colorOf({ level: "info", title: "t", description: "", fields: {} }), 0x57f287);
+  assert.equal(colorOf({ level: "warn", title: "t", description: "", fields: {} }), 0xfee75c);
+  assert.equal(colorOf({ level: "error", title: "t", description: "", fields: {} }), 0xed4245);
+});
+
+test("an unmapped field key is used as its own label", () => {
+  const body = formatDiscord({
+    level: "info",
+    title: "t",
+    description: "",
+    fields: { somethingNew: 3 },
+  });
+  assert.deepEqual(body.embeds[0].fields, [
+    { name: "somethingNew", value: "3", inline: true },
+  ]);
+});
+
+test("an embed with nothing to say omits description and fields", () => {
+  const [embed] = formatDiscord({ level: "debug", title: "t", description: "", fields: {} }).embeds;
+  assert.equal("description" in embed, false);
+  assert.equal("fields" in embed, false);
+});
+
+test("the generic body is the canonical notification", () => {
+  const notification = buildNotification(REQUESTED);
+  assert.deepEqual(formatGeneric(notification), {
+    level: "info",
+    title: "Album requested",
+    description: "**Mezzanine** — Massive Attack",
+    fields: { rating: 10, resolvedBy: "track-on-album", searched: true },
+  });
 });
