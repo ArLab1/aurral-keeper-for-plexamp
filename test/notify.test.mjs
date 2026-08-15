@@ -235,3 +235,12 @@ test("an unusable level or format is rejected at construction", () => {
   assert.throws(() => new Notifier({ url: "https://home.lan/hook", level: "verbose" }), /NOTIFY_LEVEL/);
   assert.throws(() => new Notifier({ url: "https://home.lan/hook", format: "slack" }), /NOTIFY_FORMAT/);
 });
+
+test("a result that throws while being read does not throw", async () => {
+  const notifier = new Notifier({
+    fetch: recordingFetch([]),
+    url: "https://home.lan/hook",
+    level: "debug",
+  });
+  await notifier.notify({ get action() { throw new Error("hostile"); } });
+});

@@ -155,9 +155,9 @@ export class Notifier {
 
   async notify(result, error = null) {
     if (!this.enabled()) return;
-    const notification = buildNotification(result, error);
-    if (LEVELS.indexOf(notification.level) < LEVELS.indexOf(this.level)) return;
     try {
+      const notification = buildNotification(result, error);
+      if (LEVELS.indexOf(notification.level) < LEVELS.indexOf(this.level)) return;
       const response = await this.fetch(this.url, {
         method: "POST",
         headers: { "content-type": "application/json" },
