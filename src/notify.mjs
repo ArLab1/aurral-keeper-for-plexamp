@@ -33,7 +33,7 @@ export function buildNotification(result, error = null) {
     return {
       level: failed ? "warn" : "info",
       title: failed ? "Album requested, search failed" : "Album requested",
-      description: `**${result.albumName}** — ${result.artistName}`,
+      description: `**${result.albumName || ""}** — ${result.artistName || ""}`,
       fields: presentFields({
         rating: result.rating,
         resolvedBy: result.resolvedBy,
@@ -49,7 +49,9 @@ export function buildNotification(result, error = null) {
       level: "warn",
       title: "No album matched",
       description: `**${track.trackName || ""}** — ${track.artistName || ""}`,
-      fields: presentFields({ rating: result.rating }),
+      // classifyRating never attaches a rating to this outcome — there is
+      // nothing to carry here.
+      fields: {},
     };
   }
 
@@ -137,6 +139,13 @@ export class Notifier {
     if (!LEVELS.includes(level)) {
       throw new Error(`NOTIFY_LEVEL must be one of: ${LEVELS.join(", ")}`);
     }
+    if (url) {
+      try {
+        new URL(url);
+      } catch {
+        throw new Error("NOTIFY_URL is not a valid URL");
+      }
+    }
     const resolved = format || (url ? detectFormat(url) : "generic");
     if (!FORMATTERS[resolved]) {
       throw new Error(`NOTIFY_FORMAT must be one of: ${Object.keys(FORMATTERS).join(", ")}`);
@@ -164,11 +173,12 @@ export class Notifier {
         body: JSON.stringify(FORMATTERS[this.format](notification, { username: this.username })),
         signal: AbortSignal.timeout(this.timeoutMs),
       });
+      await response.text();
       if (!response.ok) {
         console.warn(`Notification returned ${response.status}`);
       }
     } catch (sendError) {
-      console.warn(`Notification failed: ${sendError.message}`);
+      console.warn(`Notification failed: ${sendError?.message}`);
     }
   }
 }

@@ -656,8 +656,8 @@ export async function loadConfig() {
     },
     notify: {
       url: await secretFromEnv("NOTIFY_URL", { optional: true }),
-      level: process.env.NOTIFY_LEVEL || "warn",
-      format: process.env.NOTIFY_FORMAT || null,
+      level: String(process.env.NOTIFY_LEVEL || "warn").trim().toLowerCase(),
+      format: process.env.NOTIFY_FORMAT ? String(process.env.NOTIFY_FORMAT).trim().toLowerCase() : null,
       username: process.env.NOTIFY_USERNAME || "Aurral Keeper",
     },
   };

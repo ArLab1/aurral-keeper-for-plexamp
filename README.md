@@ -191,7 +191,9 @@ ntfy and Gotify need their own key names and are not supported yet. Override
 the detected format with `NOTIFY_FORMAT=discord|generic`.
 
 Delivery is fire-and-forget: a failed or slow webhook is logged and never
-changes what Plex sees.
+changes what Plex sees. Each post times out after 5 seconds, there are no
+retries, and a failed or rate-limited post is dropped rather than queued —
+the next outcome is what you'll see next.
 
 ## Layout
 

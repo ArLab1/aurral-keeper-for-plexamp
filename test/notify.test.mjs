@@ -42,7 +42,7 @@ test("a requested album whose search failed is a warning", () => {
   assert.equal(notification.fields.searchError, "Lidarr timed out");
 });
 
-test("an unresolved album is a warning describing the track", () => {
+test("an unresolved album is a warning describing the track, with no fields", () => {
   const notification = buildNotification({
     action: "ignore",
     reason: "unresolved-album",
@@ -51,6 +51,13 @@ test("an unresolved album is a warning describing the track", () => {
   assert.equal(notification.level, "warn");
   assert.equal(notification.title, "No album matched");
   assert.equal(notification.description, "**Roygbiv** — Boards of Canada");
+  assert.deepEqual(notification.fields, {});
+});
+
+test("a requested album with a null album name has no literal null in the description", () => {
+  const notification = buildNotification({ ...REQUESTED, albumName: null });
+  assert.equal(notification.description, "**** — Massive Attack");
+  assert.equal(notification.description.includes("null"), false);
 });
 
 test("every other ignore is debug, with the reason in the title", () => {
@@ -234,6 +241,17 @@ test("a 404 from a deleted webhook does not throw", async () => {
 test("an unusable level or format is rejected at construction", () => {
   assert.throws(() => new Notifier({ url: "https://home.lan/hook", level: "verbose" }), /NOTIFY_LEVEL/);
   assert.throws(() => new Notifier({ url: "https://home.lan/hook", format: "slack" }), /NOTIFY_FORMAT/);
+});
+
+test("an unparseable NOTIFY_URL throws at construction without leaking the value", () => {
+  assert.throws(
+    () => new Notifier({ url: "not a url", level: "info" }),
+    (error) => {
+      assert.match(error.message, /NOTIFY_URL/);
+      assert.equal(error.message.includes("not a url"), false);
+      return true;
+    },
+  );
 });
 
 test("a result that throws while being read does not throw", async () => {
