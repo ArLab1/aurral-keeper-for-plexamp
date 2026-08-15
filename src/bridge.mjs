@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
+import { Notifier } from "./notify.mjs";
 
 const DEFAULT_MAX_BODY_BYTES = 12 * 1024 * 1024;
 const DEFAULT_FLOW_JOB_LIMIT = 200;
@@ -151,11 +152,14 @@ export function classifyRating(payload, metadata, options = {}) {
   return { action: "keep", rating, track, file: file || null };
 }
 
-async function secretFromEnv(name) {
+async function secretFromEnv(name, { optional = false } = {}) {
   const direct = String(process.env[name] || "").trim();
   if (direct) return direct;
   const file = String(process.env[`${name}_FILE`] || "").trim();
-  if (!file) throw new Error(`${name} or ${name}_FILE is required`);
+  if (!file) {
+    if (optional) return null;
+    throw new Error(`${name} or ${name}_FILE is required`);
+  }
   const value = (await readFile(file, "utf8")).trim();
   if (!value) throw new Error(`${name}_FILE is empty`);
   return value;
@@ -650,6 +654,12 @@ export async function loadConfig() {
       maxTracklistLookups: Number(process.env.MAX_TRACKLIST_LOOKUPS || DEFAULT_TRACKLIST_LOOKUPS),
       triggerSearch: String(process.env.TRIGGER_SEARCH || "true").toLowerCase() !== "false",
     },
+    notify: {
+      url: await secretFromEnv("NOTIFY_URL", { optional: true }),
+      level: process.env.NOTIFY_LEVEL || "warn",
+      format: process.env.NOTIFY_FORMAT || null,
+      username: process.env.NOTIFY_USERNAME || "Aurral Keeper",
+    },
   };
 }
 
@@ -660,6 +670,11 @@ export async function start(config = null) {
     () => console.log(`Flow job index ready: ${bridge.flowJobs.byPath.size} tracks`),
     (error) => console.warn(`Flow job index deferred: ${error.message}`),
   );
+
+  const notifier = new Notifier({ fetch: bridge.fetch, ...(config.notify || {}) });
+  if (notifier.enabled()) {
+    console.log(`Notifications enabled: ${notifier.format} format, level ${notifier.level}`);
+  }
 
   const expectedPath = `/plex/${encodeURIComponent(config.webhookSecret)}`;
   const server = createServer(async (req, res) => {
@@ -680,16 +695,18 @@ export async function start(config = null) {
       const payload = parsePlexWebhook(req.headers["content-type"] || "", body);
       const result = await bridge.process(payload);
       console.log(JSON.stringify({ event: payload?.event, account: payload?.Account?.title, ...result }));
+      notifier.notify(result);
       return jsonResponse(res, result.action === "requested" ? 200 : 202, result);
     } catch (error) {
       console.error(error.stack || error.message);
+      notifier.notify(null, error);
       return jsonResponse(res, error.statusCode || 500, { error: error.message });
     }
   });
   server.listen(config.port, "0.0.0.0", () => {
     console.log(`Aurral Keeper for Plexamp listening on port ${config.port}`);
   });
-  return { server, bridge };
+  return { server, bridge, notifier };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

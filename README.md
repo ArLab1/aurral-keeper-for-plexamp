@@ -95,6 +95,10 @@ Requires Node 22+. Every secret also accepts a direct value instead of a file
 | `FLOW_JOB_CACHE_MS` | `300000` | How long the flow track index is reused |
 | `MAX_TRACKLIST_LOOKUPS` | `12` | Cap on tracklist reads per resolution |
 | `TRIGGER_SEARCH` | `true` | Ask Lidarr to search immediately |
+| `NOTIFY_URL` / `NOTIFY_URL_FILE` | — | Outbound webhook for notifications; unset disables them |
+| `NOTIFY_LEVEL` | `warn` | Minimum level to post: `debug`, `info`, `warn`, `error` |
+| `NOTIFY_FORMAT` | auto | `discord` or `generic`; detected from the URL host |
+| `NOTIFY_USERNAME` | `Aurral Keeper` | Display name (Discord format only) |
 | `PORT` | `3010` | Listen port |
 
 Endpoints: `POST /plex/<secret>` for the webhook, `GET /health` for liveness.
@@ -150,11 +154,52 @@ track to try again. The log line reports `searched`, and `searchSkipped` or
 Ratings below the threshold, ratings outside the Aurral library, and lowering a
 rating are all ignored.
 
+## Notifications
+
+Set `NOTIFY_URL` to a webhook and the keeper posts what it does. Unset, the
+feature is inert. The URL is a credential, so it reads from a file too:
+
+```yaml
+    environment:
+      NOTIFY_URL_FILE: "/run/keeper-secrets/notify_url"
+      NOTIFY_LEVEL: "warn"
+```
+
+Outcomes carry a log-style level, and only those at or above `NOTIFY_LEVEL`
+are sent:
+
+| Level | Outcome |
+| --- | --- |
+| `error` | The webhook handler threw |
+| `warn` | No album matched a 5-star track, or the Lidarr search failed |
+| `info` | An album was requested |
+| `debug` | Everything ignored — below threshold, outside the library, duplicate |
+
+The default `warn` means a quiet channel that speaks up only when something
+needs you. `NOTIFY_LEVEL=info` adds a line per album requested.
+
+A `discord.com` URL is posted as an embed, colored by level. Any other URL gets
+the canonical object, which works directly with Home Assistant, n8n, and
+anything you write yourself:
+
+```json
+{"level":"info","title":"Album requested","description":"**Mezzanine** — Massive Attack",
+ "fields":{"rating":10,"resolvedBy":"track-on-album","searched":true}}
+```
+
+ntfy and Gotify need their own key names and are not supported yet. Override
+the detected format with `NOTIFY_FORMAT=discord|generic`.
+
+Delivery is fire-and-forget: a failed or slow webhook is logged and never
+changes what Plex sees.
+
 ## Layout
 
 ```
 src/bridge.mjs        the whole service
+src/notify.mjs        outbound webhook notifications
 test/bridge.test.mjs  node --test suite, no network
+test/notify.test.mjs  notification unit tests
 Dockerfile            stock node:22-alpine, no build step
 compose.yaml          example deployment
 ```
