@@ -15,6 +15,9 @@ services:
       PLEX_TOKEN_FILE: "/run/keeper-secrets/plex_token"
       AURRAL_API_KEY_FILE: "/run/keeper-secrets/aurral_api_key"
       WEBHOOK_SECRET_FILE: "/run/keeper-secrets/webhook_secret"
+      # Optional: post outcomes to a webhook. Discord URLs become embeds.
+      # NOTIFY_URL_FILE: "/run/keeper-secrets/notify_url"
+      # NOTIFY_LEVEL: "warn"
     volumes:
       - ./secrets:/run/keeper-secrets:ro
     # The bridge holds no state and writes nothing.
